@@ -6,7 +6,7 @@ from operator import itemgetter
 g_jugadores = ["Piter", "Gustavo", "Kitos", "David", "Mian", "Pado", "Rafa", "Sanfe", "Richal", "Jota"]
 g_titulos = [1,1,0,1,0,0,0,0,0,0]
 g_cucharaMadera = [0,0,0,0,0,1,0,0,0,0]
-g_historicoPuntos = [786,580,772,789,660,497,634,644,556,509]
+g_historicoPuntos = [2358,2560,2595,2421,1972,2009,634,2165,2237,509]
 g_dataBaseName = "Comunio.db"
 g_numJornadas = 50
 g_resultDir = ".\\Jornadas"
@@ -186,6 +186,8 @@ def parseArgs(args):
 			bOk = True
 		elif (args[1].lower() == "reset"):
 			bOk = True
+		elif (args[1].lower() == "history"):
+			bOk = True
 	
 	if not bOk:
 		print("Error. Uso: <py> <option>")
@@ -196,6 +198,7 @@ def parseArgs(args):
 		print("alldays - Lista los resultados de todas las jornadas cargadas")
 		print("points - Lista los puntos por jornada de cada jugador")
 		print("reset - Finaliza la temporada y actualiza los datos")
+		print("history - Muestra la clasificacion historica")
 	else:
 		strOption = args[1]	
 		
@@ -330,6 +333,23 @@ def resetSeason():
 	conn.commit()
 	conn.close()
 
+def showHistory():
+	conn = sqlite3.connect(g_dataBaseName)
+	c = conn.cursor()
+	c.execute('SELECT * FROM TJugador')
+	data = c.fetchall()
+	data.sort(key=itemgetter(5), reverse = True)
+	print("\n\nCLASIFICACION HISTORICA\n\n")
+	print("Pos\tNombre\tTitulos\thistorico\tCucharas de Madera")
+	
+	pos = 1
+	for playerData in data:
+		print("{0}\t{1}\t{2}\t{3}\t\t{4}".format(pos, playerData[1], playerData[4], playerData[5], playerData[6]))
+		pos = pos + 1		
+		
+	conn.commit()
+	conn.close()
+
 #MAIN
 if (not os.path.exists(g_dataBaseName)):
 	#os.remove(g_dataBaseName)
@@ -353,6 +373,9 @@ if bOkParams:
 		bShowGlobalData = False
 	elif ("reset" == strOption.lower()):
 		resetSeason()
+	elif ("history" == strOption.lower()):
+		showHistory()
+		bShowGlobalData = False
 
 if (bShowGlobalData):
  showGlobalClassification()	
