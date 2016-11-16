@@ -4,8 +4,9 @@ import sys
 from operator import itemgetter
 
 g_jugadores = ["Piter", "Gustavo", "Kitos", "David", "Mian", "Pado", "Rafa", "Sanfe", "Richal", "Jota"]
-g_titulos = [1,1,0,1,0,0,0,0,0,0]
-g_cucharaMadera = [0,0,0,0,0,1,0,0,0,0]
+g_titulos = [1,1,1,1,0,0,0,0,0,0]
+g_cucharaMadera = [0,0,0,0,0,1,1,0,0,0]
+g_trofeosVeraniegos = [0,0,0,0,1,0,0,0,0,0]
 g_historicoPuntos = [2358,2560,2595,2421,1972,2009,634,2165,2237,509]
 g_dataBaseName = "Comunio.db"
 g_numJornadas = 50
@@ -25,7 +26,7 @@ def createDataBase():
 	c = conn.cursor()
 	conn.execute('pragma foreign_keys=ON')
 	# Create tables
-	c.execute('''CREATE TABLE TJugador (id INTEGER PRIMARY KEY AUTOINCREMENT,name text NOT NULL UNIQUE, puntos INTEGER NOT NULL, pasta INTEGER NOT NULL, titulos INTEGER NOT NULL, historicoPuntos INTEGER NOT NULL, cucharas INTEGER NOT NULL)''')
+	c.execute('''CREATE TABLE TJugador (id INTEGER PRIMARY KEY AUTOINCREMENT,name text NOT NULL UNIQUE, puntos INTEGER NOT NULL, pasta INTEGER NOT NULL, titulos INTEGER NOT NULL, historicoPuntos INTEGER NOT NULL, cucharas INTEGER NOT NULL, trofeos INTEGER NOT NULL)''')
 	c.execute('''CREATE TABLE TJornada
              (id INTEGER PRIMARY KEY AUTOINCREMENT,name text NOT NULL UNIQUE, completed INTEGER NOT NULL CHECK (completed IN (0,1)))''')
 	c.execute('''CREATE TABLE TPuntuacion
@@ -35,7 +36,7 @@ def createDataBase():
 	#Insertar jugadores
 	pos = 0
 	for player in g_jugadores:
-		c.execute("INSERT INTO TJugador(name, puntos, pasta, titulos, historicoPuntos, cucharas) VALUES (?, 0, 0, ?, ?, ?)", [player, g_titulos[pos], g_historicoPuntos[pos], g_cucharaMadera[pos]])
+		c.execute("INSERT INTO TJugador(name, puntos, pasta, titulos, historicoPuntos, cucharas, trofeos) VALUES (?, 0, 0, ?, ?, ?)", [player, g_titulos[pos], g_historicoPuntos[pos], g_cucharaMadera[pos], g_trofeosVeraniegos[pos]])
 		pos = pos + 1
 	#Jornadas
 	for i in range(g_numJornadas):
@@ -212,15 +213,15 @@ def showGlobalClassification():
 	data.sort(key=itemgetter(2), reverse = True)
 	print("\n\nCLASIFICACION GLOBAL\n\n")
 	g_resultsFile.write("CLASIFICACION GLOBAL\n")
-	print("Pos\tNombre\tTitulos\tPuntos\thistorico\tPasta\tCucharas de Madera")
-	g_resultsFile.write("Pos;Nombre;Titulos;Puntos;historico;Pasta;Cucharas de Madera\n")
+	print("Pos\tNombre\tTitulos\tPuntos\thistorico\tPasta\tCucharas\tBolos")
+	g_resultsFile.write("Pos;Nombre;Titulos;Puntos;historico;Pasta;Cucharas de Madera;Bolos Veraniegos\n")
 	
 	pos = 1
 	totalMoney = 0
 	for playerData in data:
 		money = playerData[3]/100
-		print("{0}\t{1}\t{2}\t{3}\t{4}\t\t{5}\t{6}".format(pos, playerData[1], playerData[4],playerData[2], playerData[5], money, playerData[6]))
-		g_resultsFile.write("{0};{1};{2};{3};{4};{5};{6}\n".format(pos, playerData[1], playerData[4], playerData[2],playerData[5], money, playerData[6]))
+		print("{0}\t{1}\t{2}\t{3}\t{4}\t\t{5}\t{6}\t\t{7}".format(pos, playerData[1], playerData[4],playerData[2], playerData[5], money, playerData[6], playerData[7]))
+		g_resultsFile.write("{0};{1};{2};{3};{4};{5};{6};{7}\n".format(pos, playerData[1], playerData[4], playerData[2],playerData[5], money, playerData[6], playerData[7]))
 		totalMoney = totalMoney + money
 		pos = pos + 1		
 	
@@ -324,7 +325,7 @@ def resetSeason():
 	data = c.fetchall()
 	data.sort(key=itemgetter(2), reverse = True)
 	looserPos = len(data) - 1
-	winnerPoints = data[0][2]
+	winnerPoints = data[0][2]	 
 	print("Ganador de la temporada: {0} {1}".format(data[0][1], winnerPoints))
 	print("Cuchara de Madera: {0} {1} ".format(data[looserPos][1], data[looserPos][2]))
 	c.execute("UPDATE TJugador SET puntos = 0, pasta = 0")
@@ -340,11 +341,11 @@ def showHistory():
 	data = c.fetchall()
 	data.sort(key=itemgetter(5), reverse = True)
 	print("\n\nCLASIFICACION HISTORICA\n\n")
-	print("Pos\tNombre\tTitulos\thistorico\tCucharas de Madera")
+	print("Pos\tNombre\tTitulos\thistorico\tCucharas\tBolos Veraniegos")
 	
 	pos = 1
 	for playerData in data:
-		print("{0}\t{1}\t{2}\t{3}\t\t{4}".format(pos, playerData[1], playerData[4], playerData[5], playerData[6]))
+		print("{0}\t{1}\t{2}\t{3}\t\t{4}\t\t{5}".format(pos, playerData[1], playerData[4], playerData[5], playerData[6], playerData[7]))
 		pos = pos + 1		
 		
 	conn.commit()
