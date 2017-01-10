@@ -4,8 +4,8 @@ import sys
 from operator import itemgetter
 
 g_jugadores = ["Piter", "Gustavo", "Kitos", "David", "Mian", "Pado", "Rafa", "Sanfe", "Richal", "Jota"]
-g_titulos = [1,1,1,1,0,0,0,0,0,0]
-g_cucharaMadera = [0,0,0,0,0,1,1,0,0,0]
+g_titulos = [1,1,2,1,0,0,0,0,0,0]
+g_cucharaMadera = [0,0,0,0,0,1,1,0,1,0]
 g_trofeosVeraniegos = [0,0,0,0,1,0,0,0,0,0]
 g_historicoPuntos = [2358,2560,2595,2421,1972,2009,634,2165,2237,509]
 g_dataBaseName = "Comunio.db"
@@ -339,7 +339,7 @@ def showHistory():
 	c = conn.cursor()
 	c.execute('SELECT * FROM TJugador')
 	data = c.fetchall()
-	data.sort(key=itemgetter(5), reverse = True)
+	data.sort(key=itemgetter(4,5), reverse = True)
 	print("\n\nCLASIFICACION HISTORICA\n\n")
 	print("Pos\tNombre\tTitulos\thistorico\tCucharas\tBolos Veraniegos")
 	
