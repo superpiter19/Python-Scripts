@@ -3,11 +3,11 @@ import os
 import sys
 from operator import itemgetter
 
-g_jugadores = ["Piter", "Gustavo", "Kitos", "David", "Mian", "Pado", "Rafa", "Sanfe", "Richal", "Jota"]
-g_titulos = [1,1,2,1,0,0,0,0,0,0]
-g_cucharaMadera = [0,0,0,0,0,1,1,0,1,0]
-g_trofeosVeraniegos = [0,0,0,0,1,0,0,0,0,0]
-g_historicoPuntos = [2358,2560,2595,2421,1972,2009,634,2165,2237,509]
+g_jugadores = ["Piter", "Gustavo", "Kitos", "David", "Mian", "Pado", "Rafa", "Sanfe", "Richal", "Jota", "Pablo"]
+g_titulos = [1,1,3,1,0,0,0,0,0,0,0]
+g_cucharaMadera = [0,0,0,0,0,1,1,1,1,0,1]
+g_trofeosVeraniegos = [0,0,0,0,1,0,0,0,0,0,0]
+g_historicoPuntos = [4994,5457,5716,4968,4569,4545,3176,4790,4776,3031,0]
 g_dataBaseName = "Comunio.db"
 g_numJornadas = 50
 g_resultDir = ".\\Jornadas"
@@ -36,7 +36,7 @@ def createDataBase():
 	#Insertar jugadores
 	pos = 0
 	for player in g_jugadores:
-		c.execute("INSERT INTO TJugador(name, puntos, pasta, titulos, historicoPuntos, cucharas, trofeos) VALUES (?, 0, 0, ?, ?, ?)", [player, g_titulos[pos], g_historicoPuntos[pos], g_cucharaMadera[pos], g_trofeosVeraniegos[pos]])
+		c.execute("INSERT INTO TJugador(name, puntos, pasta, titulos, historicoPuntos, cucharas, trofeos) VALUES (?, 0, 0, ?, ?, ?, ?)", [player, g_titulos[pos], g_historicoPuntos[pos], g_cucharaMadera[pos], g_trofeosVeraniegos[pos]])
 		pos = pos + 1
 	#Jornadas
 	for i in range(g_numJornadas):
@@ -339,7 +339,7 @@ def showHistory():
 	c = conn.cursor()
 	c.execute('SELECT * FROM TJugador')
 	data = c.fetchall()
-	data.sort(key=itemgetter(4,5), reverse = True)
+	data.sort(key=itemgetter(4,7,5), reverse = True)
 	print("\n\nCLASIFICACION HISTORICA\n\n")
 	print("Pos\tNombre\tTitulos\thistorico\tCucharas\tBolos Veraniegos")
 	
