@@ -189,6 +189,8 @@ def parseArgs(args):
 			bOk = True
 		elif (args[1].lower() == "history"):
 			bOk = True
+		elif (args[1].lower() == "delete") and (len(args) == 3):
+			bOk = True
 	
 	if not bOk:
 		print("Error. Uso: <py> <option>")
@@ -200,6 +202,7 @@ def parseArgs(args):
 		print("points - Lista los puntos por jornada de cada jugador")
 		print("reset - Finaliza la temporada y actualiza los datos")
 		print("history - Muestra la clasificacion historica")
+		print("delete <idJornada> - Elimina los resultados para la jornada indicada ")
 	else:
 		strOption = args[1]	
 		
@@ -237,7 +240,7 @@ def getDBDayData(idJornada):
 	'''
 	conn = sqlite3.connect(g_dataBaseName)
 	c = conn.cursor()
-	c.execute("SELECT TJugador.name, TPuntuacion.puntos, TPuntuacion.pasta FROM TJugador,TJornada JOIN TPuntuacion ON TJugador.id = TPuntuacion.jugadorID AND TJornada.id = TPuntuacion.jornadaID AND (TJornada.id =?)", [idJornada])
+	c.execute("SELECT TJugador.name, TPuntuacion.puntos, TPuntuacion.pasta, TPuntuacion.jugadorID FROM TJugador,TJornada JOIN TPuntuacion ON TJugador.id = TPuntuacion.jugadorID AND TJornada.id = TPuntuacion.jornadaID AND (TJornada.id =?)", [idJornada])
 	data = c.fetchall()
 	conn.commit()
 	conn.close()
@@ -260,7 +263,27 @@ def printDay(strNumDay):
 		printDayData(dayName, idJornada)
 	else:
 		print("Jornada no cargada: {0}".format(dayName))
-
+		
+def deleteDayResults(strNumDay):
+	dayName = "JORNADA " + strNumDay
+	bLoaded, idJornada = isDayPrevioslyLoaded(dayName)	
+	if bLoaded:	
+		data = getDBDayData(idJornada)
+		conn = sqlite3.connect(g_dataBaseName)
+		c = conn.cursor()
+		for reg in data:
+			money = reg[2]
+			points = reg[1]
+			playerID = reg[3]			
+			c.execute("UPDATE TJugador SET puntos = puntos - ?, pasta = pasta - ?, historicoPuntos = historicoPuntos - ? WHERE id = ?",[points, money, points, playerID])
+		'''Se borra La jornada'''		
+		c.execute("UPDATE TJornada SET completed = 0 WHERE id = ?",[idJornada])
+		c.execute("DELETE FROM TPuntuacion WHERE (TPuntuacion.jornadaID =?)", [idJornada])
+		conn.commit()
+		conn.close()	
+	else:
+		print("Jornada no cargada: {0}".format(dayName))
+	
 def getLoadedDaysStr():
 	conn = sqlite3.connect(g_dataBaseName)
 	c = conn.cursor()
@@ -351,6 +374,8 @@ def showHistory():
 	conn.commit()
 	conn.close()
 
+	
+
 #MAIN
 if (not os.path.exists(g_dataBaseName)):
 	#os.remove(g_dataBaseName)
@@ -377,6 +402,8 @@ if bOkParams:
 	elif ("history" == strOption.lower()):
 		showHistory()
 		bShowGlobalData = False
+	elif ("delete" == strOption.lower()):
+		deleteDayResults(sys.argv[2])		
 
 if (bShowGlobalData):
  showGlobalClassification()	
