@@ -4,8 +4,8 @@ import sys
 from operator import itemgetter
 
 g_jugadores = ["Piter", "Gustavo", "Kitos", "David", "Mian", "Pado", "Rafa", "Sanfe", "Richal", "Jota", "Pablo"]
-g_titulos = [1,1,3,1,0,0,0,0,0,0,0]
-g_cucharaMadera = [0,0,0,0,0,1,1,1,1,0,1]
+g_titulos = [1,1,4,1,0,0,0,0,0,0,0]
+g_cucharaMadera = [0,0,0,0,0,2,1,1,1,0,1]
 g_trofeosVeraniegos = [0,0,0,0,1,0,0,0,0,0,0]
 g_historicoPuntos = [4994,5457,5716,4968,4569,4545,3176,4790,4776,3031,0]
 g_dataBaseName = "Comunio.db"
@@ -92,7 +92,6 @@ def insertIntoDatabase(strDayName, dayResults):
 	conn.close()
 
 def prepareData(jName, dayClassification):
-	#se ordena por puntos y en caso de empate por el que mayor valor de equipo tenga
 	dayClassification.sort(key=itemgetter(1,3), reverse = True) 	
 	pos = 1
 	print("Clasificacion {0}".format(jName))
@@ -134,6 +133,7 @@ def parseResultFile(fullPath, fileName):
 		addedPlayers = []
 		for reg in regValues:
 			splitReg = reg.split(';')
+			print(splitReg)
 			if len(splitReg) >= 3:			
 				playerName = splitReg[0]
 				playerPoints = 0
@@ -153,9 +153,7 @@ def parseResultFile(fullPath, fileName):
 					print("Error. Jugador Desconocido {0}".format(reg))
 				else:
 					dayClassification.append((playerName, playerPoints, playerPunished, playerTeamValue))
-					addedPlayers.append(playerName)
-			else:
-				print("Error en fichero {}".format(reg))	
+					addedPlayers.append(playerName)				
 		
 		for player in g_jugadores:
 			if player not in addedPlayers:
@@ -163,7 +161,7 @@ def parseResultFile(fullPath, fileName):
 				dayClassification.append((player, 0, False, 0))
 				
 		dataToInsert = prepareData(jName, dayClassification)
-		insertIntoDatabase(jName, dataToInsert)
+		insertIntoDatabase(jName, dataToInsert)		
 	
 def loadResults():
 	for root, dirs, files in os.walk(g_resultDir):
@@ -191,6 +189,11 @@ def parseArgs(args):
 			bOk = True
 		elif (args[1].lower() == "delete") and (len(args) == 3):
 			bOk = True
+		elif (args[1].lower() == "addbolo") and (len(args) == 3):
+			bOk = True
+		elif (args[1].lower() == "removebolo") and (len(args) == 3):
+			bOk = True
+			
 	
 	if not bOk:
 		print("Error. Uso: <py> <option>")
@@ -203,6 +206,8 @@ def parseArgs(args):
 		print("reset - Finaliza la temporada y actualiza los datos")
 		print("history - Muestra la clasificacion historica")
 		print("delete <idJornada> - Elimina los resultados para la jornada indicada ")
+		print("addBolo <userName> - Añade un bolo veraniego como ganado al usario pasado ")
+		print("removeBolo <userName> - quita un bolo veraniego como ganado al usario pasado ")
 	else:
 		strOption = args[1]	
 		
@@ -356,6 +361,29 @@ def resetSeason():
 	c.execute("UPDATE TJugador SET cucharas = cucharas + 1 WHERE id = ?", [data[looserPos][0]])
 	conn.commit()
 	conn.close()
+	
+def manageBolos(userName, addBolo):
+	conn = sqlite3.connect(g_dataBaseName)
+	c = conn.cursor()
+	c.execute('SELECT trofeos FROM TJugador WHERE name=?', [userName])
+	data = c.fetchall()
+	if(1 == len(data)):
+		value = data[0][0]
+		newValue = False
+		if(True == addBolo):
+			value = value + 1
+			newValue = True	
+		elif(value > 0):
+			value = value - 1
+			newValue = True
+					
+		if(True == newValue):
+			c.execute("UPDATE TJugador SET trofeos = ? WHERE name = ?",[value, userName])
+	else:
+		print("Jugador {0} no existe".format(userName))
+	
+	conn.commit()
+	conn.close()
 
 def showHistory():
 	conn = sqlite3.connect(g_dataBaseName)
@@ -373,12 +401,9 @@ def showHistory():
 		
 	conn.commit()
 	conn.close()
-
 	
-
 #MAIN
-if (not os.path.exists(g_dataBaseName)):
-	#os.remove(g_dataBaseName)
+if (not os.path.exists(g_dataBaseName)):	
 	createDataBase()
 	
 bOkParams, strOption = parseArgs(sys.argv)
@@ -404,6 +429,10 @@ if bOkParams:
 		bShowGlobalData = False
 	elif ("delete" == strOption.lower()):
 		deleteDayResults(sys.argv[2])		
+	elif ("addbolo" == strOption.lower()):
+		manageBolos(sys.argv[2], True)		
+	elif ("removebolo" == strOption.lower()):
+		manageBolos(sys.argv[2], False)			
 
 if (bShowGlobalData):
  showGlobalClassification()	
