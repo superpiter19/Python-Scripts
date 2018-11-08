@@ -214,6 +214,8 @@ def parseArgs(args):
 	return bOk,strOption
 
 def showGlobalClassification():
+	loadedDays = getLoadedDaysStr()
+	numDays = len(loadedDays)
 	conn = sqlite3.connect(g_dataBaseName)
 	c = conn.cursor()
 	c.execute('SELECT * FROM TJugador')
@@ -221,15 +223,19 @@ def showGlobalClassification():
 	data.sort(key=itemgetter(2), reverse = True)
 	print("\n\nCLASIFICACION GLOBAL\n\n")
 	g_resultsFile.write("CLASIFICACION GLOBAL\n")
-	print("Pos\tNombre\tTitulos\tPuntos\thistorico\tPasta\tCucharas\tBolos")
-	g_resultsFile.write("Pos;Nombre;Titulos;Puntos;historico;Pasta;Cucharas de Madera;Bolos Veraniegos\n")
+	print("Pos\tNombre\tTitulos\tPuntos\tMedia\tHistorico\tPasta\tCucharas\tBolos")
+	g_resultsFile.write("Pos;Nombre;Titulos;Puntos;Media;Historico;Pasta;Cucharas de Madera;Bolos Veraniegos\n")
 	
 	pos = 1
 	totalMoney = 0
 	for playerData in data:
 		money = playerData[3]/100
-		print("{0}\t{1}\t{2}\t{3}\t{4}\t\t{5}\t{6}\t\t{7}".format(pos, playerData[1], playerData[4],playerData[2], playerData[5], money, playerData[6], playerData[7]))
-		g_resultsFile.write("{0};{1};{2};{3};{4};{5};{6};{7}\n".format(pos, playerData[1], playerData[4], playerData[2],playerData[5], money, playerData[6], playerData[7]))
+		average = 0
+		if(numDays > 0):
+			average = playerData[2] / numDays
+		strAverage = "%3.2f" % average
+		print("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t\t{6}\t{7}\t\t{8}".format(pos, playerData[1], playerData[4],playerData[2], strAverage, playerData[5], money, playerData[6], playerData[7]))
+		g_resultsFile.write("{0};{1};{2};{3};{4};{5};{6};{7};{8}\n".format(pos, playerData[1], playerData[4], playerData[2], strAverage, playerData[5], money, playerData[6], playerData[7]))
 		totalMoney = totalMoney + money
 		pos = pos + 1		
 	
@@ -385,7 +391,7 @@ def manageBolos(userName, addBolo):
 	conn.commit()
 	conn.close()
 
-def showHistory():
+def showHistory():	
 	conn = sqlite3.connect(g_dataBaseName)
 	c = conn.cursor()
 	c.execute('SELECT * FROM TJugador')
