@@ -26,7 +26,7 @@ def createDataBase():
 	c = conn.cursor()
 	conn.execute('pragma foreign_keys=ON')
 	# Create tables
-	c.execute('''CREATE TABLE TJugador (id INTEGER PRIMARY KEY AUTOINCREMENT,name text NOT NULL UNIQUE, puntos INTEGER NOT NULL, pasta INTEGER NOT NULL, titulos INTEGER NOT NULL, historicoPuntos INTEGER NOT NULL, cucharas INTEGER NOT NULL, trofeos INTEGER NOT NULL)''')
+	c.execute('''CREATE TABLE TJugador (id INTEGER PRIMARY KEY AUTOINCREMENT,name text NOT NULL UNIQUE, puntos INTEGER NOT NULL, pasta INTEGER NOT NULL, titulos INTEGER NOT NULL, historicoPuntos INTEGER NOT NULL, cucharas INTEGER NOT NULL, trofeos INTEGER NOT NULL, parciales INTEGER NOT NULL)''')
 	c.execute('''CREATE TABLE TJornada
              (id INTEGER PRIMARY KEY AUTOINCREMENT,name text NOT NULL UNIQUE, completed INTEGER NOT NULL CHECK (completed IN (0,1)))''')
 	c.execute('''CREATE TABLE TPuntuacion
@@ -36,7 +36,7 @@ def createDataBase():
 	#Insertar jugadores
 	pos = 0
 	for player in g_jugadores:
-		c.execute("INSERT INTO TJugador(name, puntos, pasta, titulos, historicoPuntos, cucharas, trofeos) VALUES (?, 0, 0, ?, ?, ?, ?)", [player, g_titulos[pos], g_historicoPuntos[pos], g_cucharaMadera[pos], g_trofeosVeraniegos[pos]])
+		c.execute("INSERT INTO TJugador(name, puntos, pasta, titulos, historicoPuntos, cucharas, trofeos, parciales) VALUES (?, 0, 0, ?, ?, ?, ?, 0)", [player, g_titulos[pos], g_historicoPuntos[pos], g_cucharaMadera[pos], g_trofeosVeraniegos[pos]])
 		pos = pos + 1
 	#Jornadas
 	for i in range(g_numJornadas):
@@ -75,7 +75,8 @@ def insertIntoDatabase(strDayName, dayResults):
 	selectedDayId = 0
 	if (len(result) > 0):
 		selectedDayId = result[0][0]
-		
+		partialWinner = 1
+
 		for playerData in dayResults:	
 			selectedPlayerId = 0	
 			c.execute('SELECT id FROM TJugador WHERE name=?', [playerData[0]])
@@ -83,7 +84,9 @@ def insertIntoDatabase(strDayName, dayResults):
 			c.execute("INSERT INTO TPuntuacion(jugadorID, jornadaID, puntos, pasta) VALUES(?, ?, ?, ?)",
 			[selectedPlayerId, selectedDayId, playerData[1], playerData[2]])
 			#Se actualiza el total en la tabla de jugadores
-			c.execute("UPDATE TJugador SET puntos = puntos + ?, pasta = pasta + ?, historicoPuntos = historicoPuntos + ? WHERE id = ?",[playerData[1], playerData[2], playerData[1], selectedPlayerId])
+			c.execute("UPDATE TJugador SET puntos = puntos + ?, pasta = pasta + ?, historicoPuntos = historicoPuntos + ? , parciales = parciales + ? WHERE id = ?",[playerData[1], playerData[2], playerData[1], partialWinner, selectedPlayerId])
+			#Solo el primero es el ganador
+			partialWinner = 0
 			
 		c.execute("UPDATE TJornada SET completed = 1 WHERE id = ?",[selectedDayId])
 	else:
@@ -220,11 +223,11 @@ def showGlobalClassification():
 	c = conn.cursor()
 	c.execute('SELECT * FROM TJugador')
 	data = c.fetchall()
-	data.sort(key=itemgetter(2), reverse = True)
+	data.sort(key=itemgetter(2,3), reverse = True)
 	print("\n\nCLASIFICACION GLOBAL\n\n")
 	g_resultsFile.write("CLASIFICACION GLOBAL\n")
-	print("Pos\tNombre\tTitulos\tPuntos\tMedia\tHistorico\tPasta\tCucharas\tBolos")
-	g_resultsFile.write("Pos;Nombre;Titulos;Puntos;Media;Historico;Pasta;Cucharas de Madera;Bolos Veraniegos\n")
+	print("Pos\tNombre\tTitulos\tPuntos\tJornadas Ganadas\tMedia\tHistorico\tPasta\tCucharas\tBolos")
+	g_resultsFile.write("Pos;Nombre;Titulos;Puntos;Jornadas Ganadas;Media;Historico;Pasta;Cucharas de Madera;Bolos Veraniegos\n")
 	
 	pos = 1
 	totalMoney = 0
@@ -234,8 +237,8 @@ def showGlobalClassification():
 		if(numDays > 0):
 			average = playerData[2] / numDays
 		strAverage = "%3.2f" % average
-		print("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t\t{6}\t{7}\t\t{8}".format(pos, playerData[1], playerData[4],playerData[2], strAverage, playerData[5], money, playerData[6], playerData[7]))
-		g_resultsFile.write("{0};{1};{2};{3};{4};{5};{6};{7};{8}\n".format(pos, playerData[1], playerData[4], playerData[2], strAverage, playerData[5], money, playerData[6], playerData[7]))
+		print("{0}\t{1}\t{2}\t{3}\t{4}\t\t\t{5}\t{6}\t\t{7}\t{8}\t\t{9}".format(pos, playerData[1], playerData[4],playerData[2], playerData[8], strAverage, playerData[5], money, playerData[6], playerData[7]))
+		g_resultsFile.write("{0};{1};{2};{3};{4};{5};{6};{7};{8};{9}\n".format(pos, playerData[1], playerData[4], playerData[2], playerData[8], strAverage, playerData[5], money, playerData[6], playerData[7]))
 		totalMoney = totalMoney + money
 		pos = pos + 1		
 	
@@ -253,6 +256,7 @@ def getDBDayData(idJornada):
 	c = conn.cursor()
 	c.execute("SELECT TJugador.name, TPuntuacion.puntos, TPuntuacion.pasta, TPuntuacion.jugadorID FROM TJugador,TJornada JOIN TPuntuacion ON TJugador.id = TPuntuacion.jugadorID AND TJornada.id = TPuntuacion.jornadaID AND (TJornada.id =?)", [idJornada])
 	data = c.fetchall()
+	data.sort(key=itemgetter(1), reverse = True)
 	conn.commit()
 	conn.close()
 	
@@ -281,12 +285,15 @@ def deleteDayResults(strNumDay):
 	if bLoaded:	
 		data = getDBDayData(idJornada)
 		conn = sqlite3.connect(g_dataBaseName)
-		c = conn.cursor()
+		c = conn.cursor()		
+		winner = 1
 		for reg in data:
 			money = reg[2]
 			points = reg[1]
 			playerID = reg[3]			
-			c.execute("UPDATE TJugador SET puntos = puntos - ?, pasta = pasta - ?, historicoPuntos = historicoPuntos - ? WHERE id = ?",[points, money, points, playerID])
+			c.execute("UPDATE TJugador SET puntos = puntos - ?, pasta = pasta - ?, historicoPuntos = historicoPuntos - ?, parciales = parciales - ? WHERE id = ?",[points, money, points, winner, playerID])
+			'''solo se resta al primero que es el ganador de la jornada'''
+			winner = 0
 		'''Se borra La jornada'''		
 		c.execute("UPDATE TJornada SET completed = 0 WHERE id = ?",[idJornada])
 		c.execute("DELETE FROM TPuntuacion WHERE (TPuntuacion.jornadaID =?)", [idJornada])
@@ -362,7 +369,7 @@ def resetSeason():
 	winnerPoints = data[0][2]	 
 	print("Ganador de la temporada: {0} {1}".format(data[0][1], winnerPoints))
 	print("Cuchara de Madera: {0} {1} ".format(data[looserPos][1], data[looserPos][2]))
-	c.execute("UPDATE TJugador SET puntos = 0, pasta = 0")
+	c.execute("UPDATE TJugador SET puntos = 0, pasta = 0, parciales = 0")
 	c.execute("UPDATE TJugador SET titulos = titulos + 1 WHERE id = ?", [data[0][0]])
 	c.execute("UPDATE TJugador SET cucharas = cucharas + 1 WHERE id = ?", [data[looserPos][0]])
 	conn.commit()
