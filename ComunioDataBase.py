@@ -196,7 +196,8 @@ def parseArgs(args):
 			bOk = True
 		elif (args[1].lower() == "removebolo") and (len(args) == 3):
 			bOk = True
-			
+		elif (args[1].lower() == "scores"):
+			bOk = True			
 	
 	if not bOk:
 		print("Error. Uso: <py> <option>")
@@ -211,6 +212,7 @@ def parseArgs(args):
 		print("delete <idJornada> - Elimina los resultados para la jornada indicada ")
 		print("addBolo <userName> - Añade un bolo veraniego como ganado al usario pasado ")
 		print("removeBolo <userName> - quita un bolo veraniego como ganado al usario pasado ")
+		print("scores - Muestra las 10 mejores y las 10 peores puntuaciones")		
 	else:
 		strOption = args[1]	
 		
@@ -223,7 +225,7 @@ def showGlobalClassification():
 	c = conn.cursor()
 	c.execute('SELECT * FROM TJugador')
 	data = c.fetchall()
-	data.sort(key=itemgetter(2,3), reverse = True)
+	data.sort(key=itemgetter(2,8), reverse = True)
 	print("\n\nCLASIFICACION GLOBAL\n\n")
 	g_resultsFile.write("CLASIFICACION GLOBAL\n")
 	print("Pos\tNombre\tTitulos\tPuntos\tJornadas Ganadas\tMedia\tHistorico\tPasta\tCucharas\tBolos")
@@ -364,7 +366,7 @@ def resetSeason():
 	#TJugador Se eliminan los puntos, primas, etc, sólo se respeta el historico
 	c.execute('SELECT * FROM TJugador')
 	data = c.fetchall()
-	data.sort(key=itemgetter(2), reverse = True)
+	data.sort(key=itemgetter(2,8), reverse = True)
 	looserPos = len(data) - 1
 	winnerPoints = data[0][2]	 
 	print("Ganador de la temporada: {0} {1}".format(data[0][1], winnerPoints))
@@ -415,6 +417,19 @@ def showHistory():
 	conn.commit()
 	conn.close()
 	
+def scores():
+	conn = sqlite3.connect(g_dataBaseName)
+	c = conn.cursor()
+	c.execute("SELECT TJugador.name, TPuntuacion.puntos, TPuntuacion.jornadaID FROM TJugador JOIN TPuntuacion ON TJugador.id = TPuntuacion.jugadorID")
+	data = c.fetchall()
+	data.sort(key=itemgetter(1), reverse = True)
+	print("Pos\tNombre\tPuntos\tJornada\t\t\t\tNombre\tPuntos\tJornada")
+	lastPos = len(data) - 1
+	for i in range(0,10):		
+		print("{0}\t{1}\t{2}\t{3}\t\t\t\t{4}\t{5}\t{6}".format(i + 1, data[i][0], data[i][1], data[i][2], data[lastPos - i][0], data[lastPos - i][1], data[lastPos - i][2]))		
+	conn.commit()
+	conn.close()
+	
 #MAIN
 if (not os.path.exists(g_dataBaseName)):	
 	createDataBase()
@@ -445,7 +460,10 @@ if bOkParams:
 	elif ("addbolo" == strOption.lower()):
 		manageBolos(sys.argv[2], True)		
 	elif ("removebolo" == strOption.lower()):
-		manageBolos(sys.argv[2], False)			
+		manageBolos(sys.argv[2], False)
+	elif ("scores" == strOption.lower()):
+		scores()
+		bShowGlobalData = False	
 
 if (bShowGlobalData):
  showGlobalClassification()	
