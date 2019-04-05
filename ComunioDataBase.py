@@ -197,7 +197,13 @@ def parseArgs(args):
 		elif (args[1].lower() == "removebolo") and (len(args) == 3):
 			bOk = True
 		elif (args[1].lower() == "scores"):
-			bOk = True			
+			bOk = True	
+		elif (args[1].lower() == "player") and (len(args) == 3):
+			for player in g_jugadores:
+				if(player.lower() == args[2].lower()):
+					bOk = True
+					break
+			
 	
 	if not bOk:
 		print("Error. Uso: <py> <option>")
@@ -212,7 +218,8 @@ def parseArgs(args):
 		print("delete <idJornada> - Elimina los resultados para la jornada indicada ")
 		print("addBolo <userName> - Añade un bolo veraniego como ganado al usario pasado ")
 		print("removeBolo <userName> - quita un bolo veraniego como ganado al usario pasado ")
-		print("scores - Muestra las 10 mejores y las 10 peores puntuaciones")		
+		print("scores - Muestra las 10 mejores y las 10 peores puntuaciones")	
+		print("player <nombre> - Muestra Info del jugador")			
 	else:
 		strOption = args[1]	
 		
@@ -229,6 +236,7 @@ def showGlobalClassification():
 	print("\n\nCLASIFICACION GLOBAL\n\n")
 	g_resultsFile.write("CLASIFICACION GLOBAL\n")
 	print("Pos\tNombre\tTitulos\tPuntos\tJornadas Ganadas\tMedia\tHistorico\tPasta\tCucharas\tBolos")
+	print("---------------------------------------------------------------------------------------------------------------------")
 	g_resultsFile.write("Pos;Nombre;Titulos;Puntos;Jornadas Ganadas;Media;Historico;Pasta;Cucharas de Madera;Bolos Veraniegos\n")
 	
 	pos = 1
@@ -244,6 +252,7 @@ def showGlobalClassification():
 		totalMoney = totalMoney + money
 		pos = pos + 1		
 	
+	print("---------------------------------------------------------------------------------------------------------------------")
 	print("Pasta Total: {0:.2f}".format(totalMoney))
 	g_resultsFile.write("TOTAL;;;;{0:.2f};\n".format(totalMoney))
 		
@@ -400,18 +409,23 @@ def manageBolos(userName, addBolo):
 	conn.commit()
 	conn.close()
 
-def showHistory():	
+def showHistory(playerName):	
+	bOnePlayer = False
+	if(len(playerName) > 0):
+		bOnePlayer = True
 	conn = sqlite3.connect(g_dataBaseName)
 	c = conn.cursor()
 	c.execute('SELECT * FROM TJugador')
 	data = c.fetchall()
 	data.sort(key=itemgetter(4,7,5), reverse = True)
-	print("\n\nCLASIFICACION HISTORICA\n\n")
+	if(False == bOnePlayer):
+		print("\n\nCLASIFICACION HISTORICA\n\n")
 	print("Pos\tNombre\tTitulos\thistorico\tCucharas\tBolos Veraniegos")
 	
 	pos = 1
 	for playerData in data:
-		print("{0}\t{1}\t{2}\t{3}\t\t{4}\t\t{5}".format(pos, playerData[1], playerData[4], playerData[5], playerData[6], playerData[7]))
+		if(bOnePlayer and playerData[1].lower() == playerName.lower()) or(False == bOnePlayer):
+			print("{0}\t{1}\t{2}\t{3}\t\t{4}\t\t{5}".format(pos, playerData[1], playerData[4], playerData[5], playerData[6], playerData[7]))
 		pos = pos + 1		
 		
 	conn.commit()
@@ -423,6 +437,7 @@ def scores():
 	c.execute("SELECT TJugador.name, TPuntuacion.puntos, TPuntuacion.jornadaID FROM TJugador JOIN TPuntuacion ON TJugador.id = TPuntuacion.jugadorID")
 	data = c.fetchall()
 	data.sort(key=itemgetter(1), reverse = True)
+	print("\nPUNTUACIONES DESTACADAS\t\t\t\t\tPUNTUACIONES LAMENTABLES\n\n")
 	print("Pos\tNombre\tPuntos\tJornada\t\t\t\tNombre\tPuntos\tJornada")
 	lastPos = len(data) - 1
 	for i in range(0,10):		
@@ -430,45 +445,121 @@ def scores():
 	conn.commit()
 	conn.close()
 	
+def getPlayerDataByDays(playerName):
+	conn = sqlite3.connect(g_dataBaseName)
+	c = conn.cursor()
+	c.execute("SELECT TJornada.id, TPuntuacion.puntos, TPuntuacion.pasta FROM TJugador,TJornada JOIN TPuntuacion ON TJugador.id = TPuntuacion.jugadorID AND TJornada.id = TPuntuacion.jornadaID AND (TJugador.Name =?)", [playerName])	
+	data = c.fetchall()
+	data.sort(key=itemgetter(0))
+	numJornadas = 0
+	totalPuntos = 0
+	totalPasta = 0
+	partialResults = getPlayerByDayGlobalPosition(playerName)
+	print("Num\tJornada\tPuntos\tPasta\tPos\tPos General")
+	for reg in data:
+		numJornadas = numJornadas + 1
+		posJornada = int((reg[2] / g_PunishIncrement) + 1)
+		print("{0}\t{1}\t{2}\t{3}\t{4}\t{5}".format(numJornadas, reg[0], reg[1], reg[2] / 100, posJornada, partialResults[numJornadas - 1]))		
+		totalPuntos = totalPuntos + reg[1]
+		totalPasta = totalPasta + reg[2]
+		
+	c.execute('SELECT * FROM TJugador')
+	data = c.fetchall()
+	data.sort(key=itemgetter(2,8), reverse = True)
+	currentPos = 0
+	for reg in data:
+		currentPos = currentPos + 1
+		if(reg[1] == playerName):
+			break
+	
+	print("\nTOTAL\n")
+	print("Jornadas\tPosicion\tPuntos\tMedia\tPasta")
+	print("{0}\t\t{1}º\t\t{2}\t{3:.2f}\t{4}".format(numJornadas,currentPos,totalPuntos,totalPuntos / numJornadas, totalPasta/100))
+	conn.commit()
+	conn.close()
+
+def getPlayerByDayGlobalPosition(playerName):
+	result = []
+	partialClassification = {}
+	for player in g_jugadores:
+		partialClassification[player] = 0
+	loadedDays = getLoadedDaysStr()
+	for dayData in loadedDays:
+		dbDayData = getDBDayData(dayData[1])
+		for reg in dbDayData:
+			partialClassification[reg[0]] = partialClassification[reg[0]] + reg[1]
+		lItems = sorted(partialClassification.items(), key=itemgetter(1), reverse = True)
+		pos = 0
+		for reg in lItems:
+			pos = pos + 1
+			if(playerName == reg[0]):
+				result.append(pos)
+				break
+		
+	return result
+	
+def showPlayerInfo(playerName):
+	print("Historico\n")
+	officialPlayerName = playerName
+	for name in g_jugadores:
+		if(name.lower() == playerName.lower()):
+			officialPlayerName = name
+			break;
+	showHistory(officialPlayerName)
+	print("\nTemporada Actual")
+	getPlayerDataByDays(officialPlayerName)	
+	
 #MAIN
 if (not os.path.exists(g_dataBaseName)):	
 	createDataBase()
 	
 bOkParams, strOption = parseArgs(sys.argv)
-g_resultsFile = open(g_resultsFileName, "w")
-bShowGlobalData = True
 
-if bOkParams:
-	if ("load" == strOption.lower()):
-		loadResults()
-	elif ("day" == strOption.lower()):
-		printDay(sys.argv[2])
-	elif ("list" == strOption.lower()):
-		listLoadedDays()
-	elif ("alldays" == strOption.lower()):
-		listAllDays()
-	elif ("points" == strOption.lower()):
-		listPoints()
-		bShowGlobalData = False
-	elif ("reset" == strOption.lower()):
-		resetSeason()
-	elif ("history" == strOption.lower()):
-		showHistory()
-		bShowGlobalData = False
-	elif ("delete" == strOption.lower()):
-		deleteDayResults(sys.argv[2])		
-	elif ("addbolo" == strOption.lower()):
-		manageBolos(sys.argv[2], True)		
-	elif ("removebolo" == strOption.lower()):
-		manageBolos(sys.argv[2], False)
-	elif ("scores" == strOption.lower()):
-		scores()
-		bShowGlobalData = False	
+bOk = False
+try:
+	g_resultsFile = open(g_resultsFileName, "w")
+	bOk = True	
+except:
+	print("Error inesperado:", sys.exc_info()[0])
+	
+	
+if bOk:
+	bShowGlobalData = True
+	if bOkParams:
+		if ("load" == strOption.lower()):
+			loadResults()
+		elif ("day" == strOption.lower()):
+			printDay(sys.argv[2])
+		elif ("list" == strOption.lower()):
+			listLoadedDays()
+		elif ("alldays" == strOption.lower()):
+			listAllDays()
+		elif ("points" == strOption.lower()):
+			listPoints()
+			bShowGlobalData = False
+		elif ("reset" == strOption.lower()):
+			resetSeason()
+		elif ("history" == strOption.lower()):
+			emptyStr = ""
+			showHistory(emptyStr)
+			bShowGlobalData = False
+		elif ("delete" == strOption.lower()):
+			deleteDayResults(sys.argv[2])		
+		elif ("addbolo" == strOption.lower()):
+			manageBolos(sys.argv[2], True)		
+		elif ("removebolo" == strOption.lower()):
+			manageBolos(sys.argv[2], False)
+		elif ("scores" == strOption.lower()):
+			scores()
+			bShowGlobalData = False	
+		elif ("player" == strOption.lower()):
+			showPlayerInfo(sys.argv[2])	
+			bShowGlobalData = False			
 
-if (bShowGlobalData):
- showGlobalClassification()	
+	if (bShowGlobalData):
+	 showGlobalClassification()	
 
-g_resultsFile.close();
+	g_resultsFile.close();
 
 
 
