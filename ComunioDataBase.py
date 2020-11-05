@@ -4,9 +4,9 @@ import sys
 from operator import itemgetter
 
 g_jugadores = ["Piter", "Gustavo", "Kitos", "David", "Mian", "Pado", "Rafa", "Sanfe", "Richal", "Jota", "Pablo"]
-g_titulos = [1,1,4,1,0,0,0,0,0,0,0]
-g_cucharaMadera = [0,0,0,0,0,2,1,1,1,0,1]
-g_trofeosVeraniegos = [0,0,0,0,1,0,0,0,0,0,0]
+g_titulos = [1,1,5,2,0,0,0,0,1,0,0]
+g_cucharaMadera = [0,0,0,0,0,2,1,1,1,1,3]
+g_trofeosVeraniegos = [0,0,0,0,1,0,0,1,0,0,0]
 g_historicoPuntos = [4994,5457,5716,4968,4569,4545,3176,4790,4776,3031,0]
 g_dataBaseName = "Comunio.db"
 g_numJornadas = 50
@@ -44,6 +44,7 @@ def createDataBase():
 		c.execute("INSERT INTO TJornada(name, completed) VALUES (?,0)", [name])
 		
 	conn.commit()
+	conn.close()
 	conn.close()
 	
 def isDayPrevioslyLoaded(strDay):
@@ -203,6 +204,8 @@ def parseArgs(args):
 				if(player.lower() == args[2].lower()):
 					bOk = True
 					break
+		elif (args[1].lower() == "winners"):
+			bOk = True	
 			
 	
 	if not bOk:
@@ -440,8 +443,9 @@ def scores():
 	print("\nPUNTUACIONES DESTACADAS\t\t\t\t\tPUNTUACIONES LAMENTABLES\n\n")
 	print("Pos\tNombre\tPuntos\tJornada\t\t\t\tNombre\tPuntos\tJornada")
 	lastPos = len(data) - 1
-	for i in range(0,10):		
-		print("{0}\t{1}\t{2}\t{3}\t\t\t\t{4}\t{5}\t{6}".format(i + 1, data[i][0], data[i][1], data[i][2], data[lastPos - i][0], data[lastPos - i][1], data[lastPos - i][2]))		
+	if(len(data) > 0):
+		for i in range(0,10):		
+			print("{0}\t{1}\t{2}\t{3}\t\t\t\t{4}\t{5}\t{6}".format(i + 1, data[i][0], data[i][1], data[i][2], data[lastPos - i][0], data[lastPos - i][1], data[lastPos - i][2]))		
 	conn.commit()
 	conn.close()
 	
@@ -508,6 +512,24 @@ def showPlayerInfo(playerName):
 	showHistory(officialPlayerName)
 	print("\nTemporada Actual")
 	getPlayerDataByDays(officialPlayerName)	
+
+def showWinners():
+	print("Ganadores de Jornadas\n")
+	loadedDays = getLoadedDaysStr()
+	winners = {}
+	for dayData in loadedDays:
+		dbDayData = getDBDayData(dayData[1])
+		playerName = dbDayData[0][0]
+		print("JORNADA {0}\t{1}\t{2}".format(dayData[1], playerName, dbDayData[0][1]))	
+		if(playerName not in winners.keys()):
+			winners[playerName] = 1
+		else:
+			winners[playerName] = winners[playerName] + 1
+	print("\nTotal")
+	print("Jugador\t\tJornadas Ganadas")
+	winners = sorted(winners.items(),key=itemgetter(1), reverse = True)
+	for winner in winners:
+		print("{0}\t\t{1}".format(winner[0], winner[1]))
 	
 #MAIN
 if (not os.path.exists(g_dataBaseName)):	
@@ -554,6 +576,9 @@ if bOk:
 			bShowGlobalData = False	
 		elif ("player" == strOption.lower()):
 			showPlayerInfo(sys.argv[2])	
+			bShowGlobalData = False
+		elif ("winners" == strOption.lower()):
+			showWinners()	
 			bShowGlobalData = False			
 
 	if (bShowGlobalData):
