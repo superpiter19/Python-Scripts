@@ -2,6 +2,7 @@ import sqlite3
 import os
 import sys
 from operator import itemgetter
+from datetime import datetime
 
 g_jugadores = ["Piter", "Gustavo", "Kitos", "David", "Mian", "Pado", "Rafa", "Sanfe", "Richal", "Jota", "Pablo"]
 g_titulos = [1,1,5,2,0,0,0,0,1,0,0]
@@ -15,6 +16,7 @@ g_PunishIncrement = 20
 g_maxPunish = g_PunishIncrement * (len(g_jugadores) - 1)
 g_resultsFileName = "Results.csv"
 g_resultsFile = None 
+g_maxSizeRecordTable = 50
 
 '''
 SELECT TJugador.name, TJornada.name, TPuntuacion.puntos, TPuntuacion.pasta, TPuntuacion.prima FROM TJugador,TJornada JOIN TPuntuacion 
@@ -82,14 +84,13 @@ def insertIntoDatabase(strDayName, dayResults):
 			selectedPlayerId = 0	
 			c.execute('SELECT id FROM TJugador WHERE name=?', [playerData[0]])
 			selectedPlayerId = c.fetchall()[0][0]
-			c.execute("INSERT INTO TPuntuacion(jugadorID, jornadaID, puntos, pasta) VALUES(?, ?, ?, ?)",
-			[selectedPlayerId, selectedDayId, playerData[1], playerData[2]])
+			c.execute("INSERT INTO TPuntuacion(jugadorID, jornadaID, puntos, pasta) VALUES(?, ?, ?, ?)", [selectedPlayerId, selectedDayId, playerData[1], playerData[2]])
 			#Se actualiza el total en la tabla de jugadores
 			c.execute("UPDATE TJugador SET puntos = puntos + ?, pasta = pasta + ?, historicoPuntos = historicoPuntos + ? , parciales = parciales + ? WHERE id = ?",[playerData[1], playerData[2], playerData[1], partialWinner, selectedPlayerId])
 			#Solo el primero es el ganador
 			partialWinner = 0
 			
-		c.execute("UPDATE TJornada SET completed = 1 WHERE id = ?",[selectedDayId])
+		c.execute("UPDATE TJornada SET completed = 1 WHERE id = ?",[selectedDayId])		
 	else:
 		print("Error en nombre de jornada en fichero {}".format(strDayName))
 	conn.commit()
@@ -165,7 +166,8 @@ def parseResultFile(fullPath, fileName):
 				dayClassification.append((player, 0, False, 0))
 				
 		dataToInsert = prepareData(jName, dayClassification)
-		insertIntoDatabase(jName, dataToInsert)		
+		insertIntoDatabase(jName, dataToInsert)	
+		insertDataIntoRecordTable(dataToInsert)
 	
 def loadResults():
 	for root, dirs, files in os.walk(g_resultDir):
@@ -206,6 +208,10 @@ def parseArgs(args):
 					break
 		elif (args[1].lower() == "winners"):
 			bOk = True	
+		elif (args[1].lower() == "piter"):
+			bOk = True	
+		elif (args[1].lower() == "records"):
+			bOk = True
 			
 	
 	if not bOk:
@@ -222,7 +228,9 @@ def parseArgs(args):
 		print("addBolo <userName> - Añade un bolo veraniego como ganado al usario pasado ")
 		print("removeBolo <userName> - quita un bolo veraniego como ganado al usario pasado ")
 		print("scores - Muestra las 10 mejores y las 10 peores puntuaciones")	
-		print("player <nombre> - Muestra Info del jugador")			
+		print("player <nombre> - Muestra Info del jugador")	
+		print("winners - Muestra los ganadores de las jornadas almacenadas")		
+		print("records - Muestra las mejores puntuaciones historicas")
 	else:
 		strOption = args[1]	
 		
@@ -530,7 +538,96 @@ def showWinners():
 	winners = sorted(winners.items(),key=itemgetter(1), reverse = True)
 	for winner in winners:
 		print("{0}\t\t{1}".format(winner[0], winner[1]))
+		
+		
+def fillBestData():
+	todayDate = datetime.today().strftime('%Y-%m-%d')
+	conn = sqlite3.connect(g_dataBaseName)
+	c = conn.cursor()
+	c.execute("DELETE FROM TRecord")
+	c.execute("SELECT TJugador.name, TPuntuacion.puntos, TJugador.id FROM TJugador JOIN TPuntuacion ON TJugador.id = TPuntuacion.jugadorID")
+	data = c.fetchall()
+	data.sort(key=itemgetter(1), reverse = True)
+	if(len(data) > 0):
+		for i in range(0,50):						
+			c.execute("INSERT INTO TRecord(jugadorID, puntos, fecha) VALUES(?, ?, ?)", [data[i][2], data[i][1], todayDate])
+			
+	c.execute("SELECT * FROM TRecord")
+	dataRecord = c.fetchall()
+	print(dataRecord)
 	
+	conn.commit()
+	conn.close()
+
+def insertDataIntoRecordTable(dataToInsert):
+	'''
+		En este objeto llega el nombre del jugador y su puntuacion en esta jornada
+	'''
+	todayDate = datetime.today().strftime('%Y-%m-%d')
+	conn = sqlite3.connect(g_dataBaseName)
+	c = conn.cursor()
+	
+	c.execute("SELECT * FROM TRecord")	
+	records = c.fetchall()
+	records.sort(key=itemgetter(2), reverse = False)
+	numberOfRecords = len(records)
+	addedData = False
+	for newData in dataToInsert:
+		c.execute('SELECT id FROM TJugador WHERE name=?', [newData[0]])
+		selectedPlayerId = c.fetchall()[0][0]
+		points = newData[1]
+		if((numberOfRecords < g_maxSizeRecordTable) or (points > records[0][2])):
+			c.execute("INSERT INTO TRecord(jugadorID, puntos, fecha) VALUES(?, ?, ?)", [selectedPlayerId, points, todayDate])
+			print("Nueva puntuacion maxima añadida: {0}-{1}".format(newData[0], points))
+			addedData = True
+		else:
+			break	
+	conn.commit()
+	conn.close()
+	
+	if(True == addedData):
+		purgeRecordData()
+		
+	
+	
+def purgeRecordData():
+	conn = sqlite3.connect(g_dataBaseName)
+	c = conn.cursor()
+	
+	print("Purgando TRecord")
+	c.execute("SELECT * FROM TRecord")	
+	records = c.fetchall()
+	records.sort(key=itemgetter(2), reverse = False)
+	numberOfRecords = len(records)
+	if(numberOfRecords > g_maxSizeRecordTable):		
+		numberToDelete = numberOfRecords - g_maxSizeRecordTable
+		print("Borrar: {0}".format(numberToDelete))
+		i = 0
+		while(i < numberToDelete):
+			c.execute("DELETE FROM TRecord Where id = ?", [records[i][0]])
+			i = i + 1
+	
+	conn.commit()
+	conn.close()
+	
+def showRecords():
+	conn = sqlite3.connect(g_dataBaseName)
+	c = conn.cursor()
+	
+	c.execute("SELECT * FROM TRecord")	
+	records = c.fetchall()
+	records.sort(key=itemgetter(2), reverse = True)
+	print("Maximas puntuaciones historicas")
+	print("POSICION\tNOMBRE\tPUNTOS\tFECHA")	
+	pos = 1
+	for data in records:
+		c.execute("SELECT name FROM TJugador WHERE id=?",[data[1]])
+		playerName = c.fetchall()[0][0]
+		print("{0}\t\t{1}\t{2}\t{3}".format(pos, playerName, data[2], data[3]))
+		pos = pos + 1
+		
+	conn.commit()
+	conn.close()
 #MAIN
 if (not os.path.exists(g_dataBaseName)):	
 	createDataBase()
@@ -579,7 +676,15 @@ if bOk:
 			bShowGlobalData = False
 		elif ("winners" == strOption.lower()):
 			showWinners()	
-			bShowGlobalData = False			
+			bShowGlobalData = False	
+		'''elif ("piter" == strOption.lower()):
+			fillBestData()	
+			bShowGlobalData = False	
+		'''
+		elif ("records" == strOption.lower()):
+			showRecords()	
+			bShowGlobalData = False	
+			
 
 	if (bShowGlobalData):
 	 showGlobalClassification()	
